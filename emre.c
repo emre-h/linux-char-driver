@@ -1,50 +1,55 @@
 #include "emre.h"
 
 static int __init init(void) {
-    printk(KERN_INFO "%s aktif\n", driver_message_prefix);
+    log("aktiflestirildi");
     register_device();
     return 0;
 }
 
 static void __exit cleanup(void) {
-    printk(KERN_INFO "%s modul temizleniyor.\n", driver_message_prefix);
+    log("modul temizleniyor");
     unregister_device();
 }
 
 static struct file_operations driver_fops = {
     .owner = THIS_MODULE,
     .read = device_file_read,
+    .write = device_file_write,
 };
 
 int register_device(void) {
     uint8_t result = 0;
 
-    printk(KERN_NOTICE "%s register_device() cagrildi.\n", driver_message_prefix);
+    log("register_device() cagrildi.");
+
     result = register_chrdev(0, device_name, &driver_fops);
     
     if(result < 0) {
-        printk(KERN_WARNING "%s  cihaz kaydi olusturulurken hata = %i\n", driver_message_prefix, result);
+        log("cihaz kaydi olusturulurken hata");
         return result;
     }
     
     major_number = result;
-    printk(KERN_NOTICE "%s cihaz kaydedildi. major number = %i", driver_message_prefix, major_number);
+
+    logd("cihaz kaydedildi. major number =", major_number);
 
     struct device *pDev;
 
-    devNo = MKDEV(major_number, 0);  // major ve minor numaraların 32 bit kombinasyonlu hali
-
+    // major ve minor numaraların 32 bit kombinasyonlu hali
+    devNo = MKDEV(major_number, 0); 
+    
     // /dev/emre olusturmak icin /sys/class/emre olusturuluyor
     pClass = class_create(THIS_MODULE, device_name);
 
     if (IS_ERR(pClass)) {
-        printk(KERN_WARNING "\nclass olusturulurken hata");
+        log("class olusturulurken hata");
         unregister_chrdev_region(devNo, 1);
         return -1;
     }
 
     if (IS_ERR(pDev = device_create(pClass, NULL, devNo, NULL, device_name))) {
-        printk(KERN_WARNING "/dev/emre olusturulurken hata\n");
+        log("/dev/emre olusturulurken hata");
+        
         class_destroy(pClass);
         unregister_chrdev_region(devNo, 1);
         return -1;
@@ -54,7 +59,7 @@ int register_device(void) {
 }
 
 void unregister_device(void) {
-    printk(KERN_NOTICE "%s unregister_device() cagrildi\n", driver_message_prefix);
+    log("unregister_device() cagrildi");
 
     if(major_number != 0) {
         device_destroy(pClass, devNo);
@@ -66,7 +71,8 @@ void unregister_device(void) {
 }
 
 static ssize_t device_file_read(struct file *file_ptr, char __user *user_buffer, size_t count, loff_t *position) {
-    printk(KERN_NOTICE "%s cihaz okuma offseti = %i, okunan byte boyutu = %u\n", driver_message_prefix, (int)*position, (unsigned int) count);
+    logd("cihaz okuma offseti =", (int) *position);
+    logd("okunan byte boyutu =", count);
 
     if(*position >= message_size)
         return 0;
@@ -79,6 +85,32 @@ static ssize_t device_file_read(struct file *file_ptr, char __user *user_buffer,
 
     *position += count; //ileri kaydir
     return count;
+}
+
+static ssize_t device_file_write(struct file *file_ptr, const char __user *user_buffer, size_t count, loff_t *position) {
+    int maxbytes;
+    int bytes_to_write;
+    int bytes_writen;
+
+    maxbytes = BUFFER_SIZE - *position;
+
+    bytes_to_write = maxbytes > count ? count : maxbytes;
+
+    bytes_writen = bytes_to_write - copy_from_user(device_buffer + *position, user_buffer, bytes_to_write);
+
+    *position += bytes_writen;
+    
+    log("cihaza yazildi");
+
+    return bytes_writen;
+}
+
+void log(const char *log_msg) {
+    printk(KERN_INFO "%s %s\n", driver_message_prefix, log_msg);    
+}
+
+void logd(const char *log_msg, int value) {
+    printk(KERN_INFO "%s %s %d\n", driver_message_prefix, log_msg, value);    
 }
 
 MODULE_LICENSE("GPL");

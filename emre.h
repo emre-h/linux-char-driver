@@ -11,6 +11,10 @@
 #include <linux/kdev_t.h>
 #include <linux/device.h>
 
+#define BUFFER_SIZE 1024
+
+static char device_buffer[BUFFER_SIZE];
+
 struct class *pClass;
 dev_t devNo;
 
@@ -24,12 +28,10 @@ static ssize_t message_size = sizeof(module_message);
 
 int register_device(void);
 void unregister_device(void);
+void log(const char *log_msg);
+void logd(const char *log_msg, int value);
 
-static ssize_t device_file_read(
-    struct file *file_ptr,
-    char __user *user_buffer,
-    size_t count,
-    loff_t *position
-);
+static ssize_t device_file_read(struct file *file_ptr, char __user *user_buffer, size_t count, loff_t *position);
+static ssize_t device_file_write(struct file *, const char *, size_t, loff_t *);
 
 #endif
