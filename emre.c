@@ -37,8 +37,6 @@ int register_device(void) {
     // /dev/emre olusturmak icin /sys/class/emre olusturuluyor
     pClass = class_create(THIS_MODULE, device_name);
 
-    //alloc_chrdev_region()
-
     if (IS_ERR(pClass)) {
         printk(KERN_WARNING "\nclass olusturulurken hata");
         unregister_chrdev_region(devNo, 1);
