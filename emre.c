@@ -1,3 +1,4 @@
+#include "linux/slab.h"
 #include "emre.h"
 
 static int __init init(void) {
@@ -74,6 +75,8 @@ void unregister_device(void) {
 }
 
 static ssize_t device_file_read(struct file *file_ptr, char __user *user_buffer, size_t count, loff_t *position) {
+    log("okunan veri:");
+    log(module_message);
     logd("cihaz okuma offseti =", (int) *position);
     logd("okunan byte boyutu =", count);
 
@@ -84,7 +87,7 @@ static ssize_t device_file_read(struct file *file_ptr, char __user *user_buffer,
         count = message_size - *position; //count boyutu asarsa max olan verilecek
 
     if(copy_to_user(user_buffer, module_message + *position, count) != 0)
-        return -EFAULT;    
+        return -EFAULT;
 
     *position += count; //ileri kaydir
     return count;
@@ -106,6 +109,12 @@ static ssize_t device_file_write(struct file *file_ptr, const char __user *user_
     log("cihaza yazildi");
     log("veri:");
     log(user_buffer);
+
+    module_message = (char*) kmalloc(count, GFP_KERNEL);
+
+    if (copy_from_user(module_message, user_buffer, count)) {
+        log("success");
+    }
 
     return bytes_writen;
 }

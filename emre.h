@@ -20,7 +20,7 @@ dev_t devNo;
 
 static int major_number = 0;
 
-static const char module_message[] = "emre-module-message: calisiyor!\n\0";
+static const char* module_message = "emre-module-message: calisiyor!\n\0";
 static const char driver_message_prefix[] = "emre-driver:";
 static const char device_name[] = "emre";
 
