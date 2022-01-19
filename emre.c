@@ -12,9 +12,12 @@ static void __exit cleanup(void) {
 }
 
 static struct file_operations driver_fops = {
-    .owner = THIS_MODULE,
-    .read = device_file_read,
-    .write = device_file_write,
+    .owner          = THIS_MODULE,
+    .unlocked_ioctl = device_file_ioctl,
+    .open           = device_file_open,
+    .release        = device_file_release,
+    .read           = device_file_read,
+    .write          = device_file_write,
 };
 
 int register_device(void) {
@@ -101,8 +104,26 @@ static ssize_t device_file_write(struct file *file_ptr, const char __user *user_
     *position += bytes_writen;
     
     log("cihaza yazildi");
+    log("veri:");
+    log(user_buffer);
 
     return bytes_writen;
+}
+
+static long device_file_ioctl(struct file *file, unsigned int cmd, unsigned long arg) {
+    log("device ioctl fonksiyonu");
+    //printk(KERN_INFO "%s %s\n", driver_message_prefix, arg);
+    return 0;
+}
+
+static int device_file_open(struct inode *inode, struct file *file) {
+    log("cihaz açık");
+    return 0;
+}
+
+static int device_file_release(struct inode *inode, struct file *file) {
+    log("cihaz kapalı\n------");
+    return 0;
 }
 
 void log(const char *log_msg) {

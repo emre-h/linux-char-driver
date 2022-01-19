@@ -11,7 +11,7 @@
 #include <linux/kdev_t.h>
 #include <linux/device.h>
 
-#define BUFFER_SIZE 1024
+#define BUFFER_SIZE 2048
 
 static char device_buffer[BUFFER_SIZE];
 
@@ -33,5 +33,10 @@ void logd(const char *log_msg, int value);
 
 static ssize_t device_file_read(struct file *file_ptr, char __user *user_buffer, size_t count, loff_t *position);
 static ssize_t device_file_write(struct file *, const char *, size_t, loff_t *);
+
+static int device_file_release(struct inode *inode, struct file *file);
+static int device_file_open(struct inode *inode, struct file *file);
+
+static long device_file_ioctl(struct file *file, unsigned int cmd, unsigned long arg);
 
 #endif
