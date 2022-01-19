@@ -121,7 +121,6 @@ static ssize_t device_file_write(struct file *file_ptr, const char __user *user_
 
 static long device_file_ioctl(struct file *file, unsigned int cmd, unsigned long arg) {
     log("device ioctl fonksiyonu");
-    //printk(KERN_INFO "%s %s\n", driver_message_prefix, arg);
     return 0;
 }
 
