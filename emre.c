@@ -1,16 +1,4 @@
-#include "linux/slab.h"
 #include "emre.h"
-
-static int __init init(void) {
-    logstr("aktiflestirildi");
-    register_device();
-    return 0;
-}
-
-static void __exit cleanup(void) {
-    logstr("modul temizleniyor");
-    unregister_device();
-}
 
 static struct file_operations driver_fops = {
     .owner          = THIS_MODULE,
@@ -19,7 +7,21 @@ static struct file_operations driver_fops = {
     .release        = device_file_release,
     .read           = device_file_read,
     .write          = device_file_write,
+    .poll           = etx_poll,
 };
+
+static int __init init(void) {
+    logstr("aktiflestirildi");
+    register_device();
+    init_timer();
+    return 0;
+}
+
+static void __exit cleanup(void) {
+    del_timer(&timer);
+    unregister_device();
+    logstr("modul temizleniyor");
+}
 
 int register_device(void) {
     uint8_t result = 0;
@@ -60,6 +62,16 @@ int register_device(void) {
     }
 
     return 0;
+}
+
+void timer_callback(struct timer_list * data) {
+    logstr("timer calisiyor");
+    mod_timer(&timer, jiffies + msecs_to_jiffies(TIMER_INTERVAL));
+}
+
+void init_timer(void) {
+    timer_setup(&timer, (timer_callback), 0);
+    mod_timer(&timer, jiffies + msecs_to_jiffies(TIMER_INTERVAL));
 }
 
 void unregister_device(void) {
@@ -118,6 +130,16 @@ static ssize_t device_file_write(struct file *file_ptr, const char __user *user_
     }
 
     return bytes_written;
+}
+
+static unsigned int etx_poll(struct file *filp, struct poll_table_struct *wait) {
+  __poll_t mask = 0;
+  
+  pr_info("Poll function\n");
+  
+  /* Do your Operation */
+    
+  return mask;
 }
 
 static long device_file_ioctl(struct file *file, unsigned int cmd, unsigned long arg) {
