@@ -1,13 +1,20 @@
 #include "emre.h"
 
+#include <linux/poll.h>
+
+static bool can_write = false;
+static bool can_read = false;
+
+DECLARE_WAIT_QUEUE_HEAD(wait_queue_etx_data);
+
 static struct file_operations driver_fops = {
-    .owner          = THIS_MODULE,
+    .owner = THIS_MODULE,
     .unlocked_ioctl = device_file_ioctl,
-    .open           = device_file_open,
-    .release        = device_file_release,
-    .read           = device_file_read,
-    .write          = device_file_write,
-    .poll           = etx_poll,
+    .open = device_file_open,
+    .release = device_file_release,
+    .read = device_file_read,
+    .write = device_file_write,
+    .poll = poll_call,
 };
 
 static int __init init(void) {
@@ -29,12 +36,12 @@ int register_device(void) {
     logstr("register_device() cagrildi.");
 
     result = register_chrdev(0, device_name, &driver_fops);
-    
-    if(result < 0) {
+
+    if (result < 0) {
         logstr("cihaz kaydi olusturulurken hata");
         return result;
     }
-    
+
     major_number = result;
 
     logstrd("cihaz kaydedildi. major number =", major_number);
@@ -42,8 +49,8 @@ int register_device(void) {
     struct device *pDev;
 
     // major ve minor numaraların 32 bit kombinasyonlu hali
-    devNo = MKDEV(major_number, 0); 
-    
+    devNo = MKDEV(major_number, 0);
+
     // /dev/emre olusturmak icin /sys/class/emre olusturuluyor
     pClass = class_create(THIS_MODULE, device_name);
 
@@ -55,7 +62,7 @@ int register_device(void) {
 
     if (IS_ERR(pDev = device_create(pClass, NULL, devNo, NULL, device_name))) {
         logstr("/dev/emre olusturulurken hata");
-        
+
         class_destroy(pClass);
         unregister_chrdev_region(devNo, 1);
         return -1;
@@ -64,9 +71,11 @@ int register_device(void) {
     return 0;
 }
 
-void timer_callback(struct timer_list * data) {
+void timer_callback(struct timer_list *data) {
+    wake_up(&wait_queue_etx_data);
     logstr("timer calisiyor");
     mod_timer(&timer, jiffies + msecs_to_jiffies(TIMER_INTERVAL));
+    can_read = true;
 }
 
 void init_timer(void) {
@@ -77,7 +86,7 @@ void init_timer(void) {
 void unregister_device(void) {
     logstr("unregister_device() cagrildi");
 
-    if(major_number != 0) {
+    if (major_number != 0) {
         device_destroy(pClass, devNo);
         class_unregister(pClass);
         class_destroy(pClass);
@@ -86,63 +95,87 @@ void unregister_device(void) {
     }
 }
 
-static ssize_t device_file_read(struct file *file_ptr, char __user *user_buffer, size_t count, loff_t *position) {
-    logstr("okunan veri:");
-    logstr(module_message);
-    logstrd("cihaz okuma offseti =", (int) *position);
-    logstrd("okunan byte boyutu =", count);
+static ssize_t device_file_read(struct file *file_ptr, char __user *user_buffer,
+                                size_t count, loff_t *position) {
+    if (can_read) {
+        logstr("okunan veri:");
+        logstr(module_message);
+        logstrd("cihaz okuma offseti =", (int)*position);
+        logstrd("okunan byte boyutu =", count);
 
-    message_size = strlen(module_message);
+        message_size = strlen(module_message);
 
-    if(*position >= message_size)
+        if (*position >= message_size) return 0;
+
+        if (*position + count > message_size)
+            count = message_size -
+                    *position;  // count boyutu asarsa max olan verilecek
+
+        if (copy_to_user(user_buffer, module_message + *position,
+                         bytes_written) != 0)
+            return -EFAULT;
+
+        *position += count;  // ileri kaydir
+        return count;
+    } else {
         return 0;
-
-    if(*position + count > message_size)
-        count = message_size - *position; //count boyutu asarsa max olan verilecek
-
-    if(copy_to_user(user_buffer, module_message + *position, bytes_written) != 0)
-        return -EFAULT;
-
-    *position += count; //ileri kaydir
-    return count;
+    }
 }
 
-static ssize_t device_file_write(struct file *file_ptr, const char __user *user_buffer, size_t count, loff_t *position) {
+static ssize_t device_file_write(struct file *file_ptr,
+                                 const char __user *user_buffer, size_t count,
+                                 loff_t *position) {
     int maxbytes;
     int bytes_to_write;
 
-    maxbytes = BUFFER_SIZE - *position;
+    if (can_write) {
+        maxbytes = BUFFER_SIZE - *position;
 
-    bytes_to_write = maxbytes > count ? count : maxbytes;
+        bytes_to_write = maxbytes > count ? count : maxbytes;
 
-    bytes_written = bytes_to_write - copy_from_user(device_buffer + *position, user_buffer, bytes_to_write);
+        bytes_written =
+            bytes_to_write - copy_from_user(device_buffer + *position,
+                                            user_buffer, bytes_to_write);
 
-    *position += bytes_written;
-    
-    logstr("cihaza yazildi");
-    logstr("veri:");
-    logstr(user_buffer);
+        *position += bytes_written;
 
-    module_message = (char*) kmalloc(bytes_written, GFP_KERNEL);
+        logstr("cihaza yazildi");
+        logstr("veri:");
+        logstr(user_buffer);
 
-    if (copy_from_user(module_message, user_buffer, bytes_written)) {
-        logstr("success");
+        module_message = (char *)kmalloc(bytes_written, GFP_KERNEL);
+
+        if (copy_from_user(module_message, user_buffer, bytes_written)) {
+            logstr("success");
+        }
     }
 
     return bytes_written;
 }
 
-static unsigned int etx_poll(struct file *filp, struct poll_table_struct *wait) {
-  __poll_t mask = 0;
-  
-  pr_info("Poll function\n");
-  
-  /* Do your Operation */
-    
-  return mask;
+static unsigned int poll_call(struct file *filp,
+                              struct poll_table_struct *wait) {
+    __poll_t mask = 0;
+
+    poll_wait(filp, &wait_queue_etx_data, wait);
+
+    if (can_read) {
+        can_read = false;
+        mask |= (POLLIN | POLLRDNORM);
+        pr_info("POLLIN\n");
+    }
+
+    if (can_write) {
+        can_write = false;
+        mask |= (POLLOUT | POLLWRNORM);
+        pr_info("POLLOUT\n");
+    }
+
+    return mask;
 }
 
-static long device_file_ioctl(struct file *file, unsigned int cmd, unsigned long arg) {
+static long device_file_ioctl(struct file *file, unsigned int cmd,
+                              unsigned long arg) {
     logstr("device ioctl fonksiyonu");
     return 0;
 }
@@ -158,11 +191,11 @@ static int device_file_release(struct inode *inode, struct file *file) {
 }
 
 void logstr(const char *logstr_msg) {
-    printk(KERN_INFO "%s %s\n", driver_message_prefix, logstr_msg);    
+    printk(KERN_INFO "%s %s\n", driver_message_prefix, logstr_msg);
 }
 
 void logstrd(const char *logstr_msg, int value) {
-    printk(KERN_INFO "%s %s %d\n", driver_message_prefix, logstr_msg, value);    
+    printk(KERN_INFO "%s %s %d\n", driver_message_prefix, logstr_msg, value);
 }
 
 MODULE_LICENSE("GPL");

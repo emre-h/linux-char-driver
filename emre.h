@@ -45,7 +45,7 @@ void init_timer(void);
 static ssize_t device_file_read(struct file *file_ptr, char __user *user_buffer, size_t count, loff_t *position);
 static ssize_t device_file_write(struct file *, const char *, size_t, loff_t *);
 
-static unsigned int etx_poll(struct file *filp, struct poll_table_struct *wait);
+static unsigned int poll_call(struct file *filp, struct poll_table_struct *wait);
 
 static int device_file_release(struct inode *inode, struct file *file);
 static int device_file_open(struct inode *inode, struct file *file);
