@@ -57,10 +57,10 @@ int register_device(void)
 
     struct device *pDev;
 
-    // major ve minor numaraların 32 bit kombinasyonlu hali
+    /* major ve minor numaraların 32 bit kombinasyonlu hali */
     devNo = MKDEV(major_number, 0);
 
-    // /dev/emre olusturmak icin /sys/class/emre olusturuluyor
+    /* /dev/emre olusturmak icin /sys/class/emre olusturuluyor */
     pClass = class_create(THIS_MODULE, device_name);
 
     if (IS_ERR(pClass))
@@ -127,13 +127,13 @@ static ssize_t device_file_read(struct file *file_ptr, char __user *user_buffer,
 
         if (*position + count > message_size)
             count = message_size -
-                    *position; // count boyutu asarsa max olan verilecek
+                    *position; /* count boyutu asarsa max olan verilecek */
 
         if (copy_to_user(user_buffer, module_message + *position,
                          bytes_written) != 0)
             return -EFAULT;
 
-        *position += count; // ileri kaydir
+        *position += count; /* ileri kaydir */
         return count;
     }
     else
@@ -232,8 +232,8 @@ static int device_file_release(struct inode *inode, struct file *file)
 int hold(char *buf, char **start, off_t offset, int count, int *eof, void *data)
 {
     int len = 0;
-    down_interruptible(&sem); // holding the semaphore
-    printk(KERN_INFO "Semaphore hold");
+    down_interruptible(&sem);
+    printk(KERN_INFO "semaphore tutuluyor");
     return len;
 }
 
