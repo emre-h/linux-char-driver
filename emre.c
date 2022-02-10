@@ -26,7 +26,6 @@ static int __init init(void)
     register_device();
     sema_init(&sem, 1);
     init_timer();
-
     return 0;
 }
 
@@ -146,34 +145,44 @@ static ssize_t device_file_write(struct file *file_ptr,
                                  const char __user *user_buffer, size_t count,
                                  loff_t *position)
 {
-    int maxbytes;
-    int bytes_to_write;
-
-    if (can_write)
+    if (down_interruptible(&sem))
     {
-        maxbytes = BUFFER_SIZE - *position;
-
-        bytes_to_write = maxbytes > count ? count : maxbytes;
-
-        bytes_written =
-            bytes_to_write - copy_from_user(device_buffer + *position,
-                                            user_buffer, bytes_to_write);
-
-        *position += bytes_written;
-
-        logstr("cihaza yazildi");
-        logstr("veri:");
-        logstr(user_buffer);
-
-        module_message = (char *)kmalloc(bytes_written, GFP_KERNEL);
-
-        if (copy_from_user(module_message, user_buffer, bytes_written))
-        {
-            logstr("success");
-        }
+        printk(KERN_INFO "semaphore tutulamıyor");
+        return -1;
     }
+    else
+    {
+        printk(KERN_INFO "semaphore tutuldu");
 
-    return bytes_written;
+        int maxbytes;
+        int bytes_to_write;
+
+        if (can_write)
+        {
+            maxbytes = BUFFER_SIZE - *position;
+
+            bytes_to_write = maxbytes > count ? count : maxbytes;
+
+            bytes_written =
+                bytes_to_write - copy_from_user(device_buffer + *position,
+                                                user_buffer, bytes_to_write);
+
+            *position += bytes_written;
+
+            logstr("cihaza yazildi");
+            logstr("veri:");
+            logstr(user_buffer);
+
+            module_message = (char *)kmalloc(bytes_written, GFP_KERNEL);
+
+            if (copy_from_user(module_message, user_buffer, bytes_written))
+            {
+                logstr("success");
+            }
+        }
+        up(&sem);
+        return bytes_written;
+    }
 }
 
 static unsigned int poll_call(struct file *filp,
@@ -227,14 +236,6 @@ static int device_file_release(struct inode *inode, struct file *file)
     logstr("cihaz kapalı\n------");
     up(&sem);
     return 0;
-}
-
-int hold(char *buf, char **start, off_t offset, int count, int *eof, void *data)
-{
-    int len = 0;
-    down_interruptible(&sem);
-    printk(KERN_INFO "semaphore tutuluyor");
-    return len;
 }
 
 void logstr(const char *logstr_msg)
