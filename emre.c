@@ -1,10 +1,7 @@
 #include "emre.h"
 
-#include <linux/poll.h>
-#include <linux/mutex.h>
 #include <linux/semaphore.h>
-
-struct mutex emre_mutex;
+#include <linux/poll.h>
 
 struct semaphore sem;
 
