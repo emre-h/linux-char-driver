@@ -147,12 +147,12 @@ static ssize_t device_file_write(struct file *file_ptr,
 {
     if (down_interruptible(&sem))
     {
-        printk(KERN_INFO "semaphore tutulamıyor");
+        printk(KERN_INFO "semaphore kilitlenemedi");
         return -1;
     }
     else
     {
-        printk(KERN_INFO "semaphore tutuldu");
+        printk(KERN_INFO "semaphore kilitlendi");
 
         int maxbytes;
         int bytes_to_write;
@@ -221,12 +221,12 @@ static int device_file_open(struct inode *inode, struct file *file)
     logstr("cihaz açık");
     if (down_interruptible(&sem))
     {
-        printk(KERN_INFO "semaphore tutulamıyor");
+        printk(KERN_INFO "semaphore kilitlenemedi");
         return -1;
     }
     else
     {
-        printk(KERN_INFO "semaphore tutuldu");
+        printk(KERN_INFO "semaphore kilitlendi");
     }
     return 0;
 }
@@ -235,6 +235,7 @@ static int device_file_release(struct inode *inode, struct file *file)
 {
     logstr("cihaz kapalı\n------");
     up(&sem);
+    printk(KERN_INFO "semaphore kilidi kaldırıldı");
     return 0;
 }
 
